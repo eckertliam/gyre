@@ -10,9 +10,9 @@
   (:import-from #:tui/layout #:make-rect #:rect-x #:rect-width #:make-layout #:split)
   (:import-from #:tui/text #:text-width)
   (:import-from #:tui/widgets/widget #:render #:render-stateful)
-  (:import-from #:tui/widgets/draw
-                #:clip-area #:style-region #:draw-text #:as-text #:highlight-spacing
-                #:selection-column-p)
+  (:import-from #:tui/widgets/draw #:clip-area #:as-text #:highlight-spacing #:selection-column-p)
+  (:import-from #:tui/buffer #:set-style-region)
+  (:import-from #:tui/buffer/text #:set-text-region)
   (:import-from #:tui/widgets/table-row
                 #:table-row #:table-row-p #:table-row-cells #:table-row-height
                 #:table-row-top-margin #:table-row-bottom-margin #:table-row-style)
@@ -227,7 +227,7 @@ rows around it. The last row may be only partly visible."
 
 (defun draw-table (table area buffer state)
   (multiple-value-bind (x y width height) (clip-area area buffer)
-    (style-region buffer x y width height (table-style table))
+    (set-style-region buffer x y width height (table-style table))
     (render (table-block table) area buffer)
     (when (table-block table)
       (setf (values x y width height) (block-inner-bounds (table-block table) x y width height)))
@@ -277,12 +277,12 @@ edge."
   (declare (type fixnum x y height) (type simple-vector columns))
   (loop for cell across (table-row-cells row)
         for column across columns
-        do (draw-text buffer (+ x (rect-x column)) y (rect-width column) height cell)))
+        do (set-text-region buffer (+ x (rect-x column)) y (rect-width column) height cell)))
 
 (defun draw-fixed-row (row buffer x y width height columns)
   "Draw the header or footer ROW (or nothing for NIL) in the WIDTH × HEIGHT region at (X, Y)."
   (when (and row (plusp height))
-    (style-region buffer x y width height (table-row-style row))
+    (set-style-region buffer x y width height (table-row-style row))
     (draw-cells row buffer x y height columns)))
 
 (defun draw-rows (table buffer x y width height columns selection-width state)
@@ -307,15 +307,15 @@ selected row, then highlight it."
               for row-height of-type fixnum = (max 0 (- (min (+ row-y (table-row-height row))
                                                               bottom)
                                                          row-y))
-              do (style-region buffer x row-y width row-height (table-row-style row))
+              do (set-style-region buffer x row-y width row-height (table-row-style row))
                  (when (eql index selected)
                    (when (plusp selection-width)
-                     (draw-text buffer x row-y (min selection-width width) row-height
+                     (set-text-region buffer x row-y (min selection-width width) row-height
                                 (table-highlight-symbol table)))
                    (setf selected-y row-y
                          selected-height row-height))
                  (draw-cells row buffer x row-y row-height columns)
                  (incf offset (row-span row))))
       (when (>= selected-height 0)
-        (style-region buffer x selected-y width selected-height
+        (set-style-region buffer x selected-y width selected-height
                       (table-row-highlight-style table))))))

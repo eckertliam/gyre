@@ -10,12 +10,12 @@
   (:shadowing-import-from #:tui/widgets/block #:block)
   (:import-from #:tui/widgets/block #:block-inner-bounds)
   (:import-from #:tui/style #:style)
-  (:import-from #:tui/buffer #:set-string)
+  (:import-from #:tui/buffer #:set-string #:set-style-region)
   (:import-from #:tui/text #:text-height #:line-width #:line-alignment)
   (:import-from #:tui/widgets/widget #:render #:render-stateful)
-  (:import-from #:tui/widgets/draw
-                #:clip-area #:style-region #:draw-line #:draw-text #:as-text #:as-line
-                #:highlight-spacing #:selection-column-p)
+  (:import-from #:tui/widgets/draw #:clip-area #:as-text #:as-line #:highlight-spacing
+                #:selection-column-p)
+  (:import-from #:tui/buffer/text #:set-aligned-line #:set-text-region)
   (:import-from #:tui/widgets/list-state
                 #:list-state #:make-list-state #:list-state-selected #:list-state-offset
                 #:list-select)
@@ -155,7 +155,7 @@ item SELECTED (or NIL) with PADDING items around it."
 
 (defun draw-list (list area buffer state)
   (multiple-value-bind (x y width height) (clip-area area buffer)
-    (style-region buffer x y width height (list-style list))
+    (set-style-region buffer x y width height (list-style list))
     (render (list-block list) area buffer)
     (when (list-block list)
       (setf (values x y width height) (block-inner-bounds (list-block list) x y width height)))
@@ -195,10 +195,10 @@ item SELECTED (or NIL) with PADDING items around it."
           for rows of-type fixnum = (- (min (+ item-y item-height) (+ y height)) top)
           do (incf used item-height)
              (when (plusp rows)
-               (draw-text buffer (+ x symbol-width) top (- width symbol-width) rows
+               (set-text-region buffer (+ x symbol-width) top (- width symbol-width) rows
                           (svref (list-items list) index) (- top item-y))
                (when (eql index selected)
-                 (style-region buffer x top width rows (list-highlight-style list)))
+                 (set-style-region buffer x top width rows (list-highlight-style list)))
                (when (plusp symbol-width)
                  (draw-symbols list buffer x top symbol-width rows (- top item-y)
                                (eql index selected)))))))
@@ -211,6 +211,6 @@ item SELECTED (or NIL) with PADDING items around it."
         do (if (and selectedp
                     (or (= (+ first-row row) 0) (list-repeat-highlight-symbol list)))
                (let ((symbol (list-highlight-symbol list)))
-                 (draw-line buffer x (+ y row) symbol-width symbol (line-alignment symbol)))
+                 (set-aligned-line buffer x (+ y row) symbol-width symbol (line-alignment symbol)))
                (set-string buffer x (+ y row) (list-blank-symbol list)
                            :max-width symbol-width))))

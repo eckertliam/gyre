@@ -8,14 +8,14 @@
   (:shadow #:block)
   (:import-from #:tui/layout #:make-rect #:rect-x #:rect-y #:rect-width #:rect-height)
   (:import-from #:tui/style #:style)
-  (:import-from #:tui/buffer #:set-cell)
+  (:import-from #:tui/buffer #:set-cell #:set-style-region)
   (:import-from #:tui/text #:line #:line-alignment #:line-width)
   (:import-from #:tui/widgets/widget #:render)
-  (:import-from #:tui/widgets/draw #:clip-area #:style-region #:draw-line #:as-line)
-  (:import-from #:tui/widgets/border
-                #:border-type #:find-border-set #:border-set-top-left #:border-set-top-right
-                #:border-set-bottom-left #:border-set-bottom-right #:border-set-vertical-left
-                #:border-set-vertical-right #:border-set-horizontal-top
+  (:import-from #:tui/widgets/draw #:clip-area #:as-line)
+  (:import-from #:tui/buffer/text #:set-aligned-line)
+  (:import-from #:tui/widgets/border #:border-type #:find-border-set #:border-set-top-left
+                #:border-set-top-right #:border-set-bottom-left #:border-set-bottom-right
+                #:border-set-vertical-left #:border-set-vertical-right #:border-set-horizontal-top
                 #:border-set-horizontal-bottom)
   (:export #:block
            #:block-inner
@@ -184,7 +184,7 @@ rect AREA. See BLOCK-INNER-BOUNDS for a version that doesn't allocate."
 (defmethod render ((block block) area buffer)
   (multiple-value-bind (x y width height) (clip-area area buffer)
     (when (and (plusp width) (plusp height))
-      (style-region buffer x y width height (block-style block))
+      (set-style-region buffer x y width height (block-style block))
       (draw-borders block buffer x y width height)
       (draw-titles block buffer x y width height :top)
       (draw-titles block buffer x y width height :bottom))))
@@ -218,9 +218,9 @@ corners where two sides meet."
       (when (sides-p (logior +left+ +top+)) (put x y (border-set-top-left set))))))
 
 (defun draw-title (block buffer x y width title alignment)
-  "Draw TITLE in the WIDTH columns at (X, Y), truncated as ALIGNMENT says (see DRAW-LINE)."
-  (style-region buffer x y width 1 (block-title-style block))
-  (draw-line buffer x y width (title-line title) alignment))
+  "Draw TITLE in the WIDTH columns at (X, Y), truncated as ALIGNMENT says (see SET-ALIGNED-LINE)."
+  (set-style-region buffer x y width 1 (block-title-style block))
+  (set-aligned-line buffer x y width (title-line title) alignment))
 
 (defun draw-titles (block buffer x y width height position)
   "Draw BLOCK's titles at POSITION, :top or :bottom, of the WIDTH × HEIGHT region at (X, Y):

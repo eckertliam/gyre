@@ -6,13 +6,14 @@
   (:shadowing-import-from #:tui/widgets/block #:block)
   (:import-from #:tui/widgets/block #:block-inner-bounds)
   (:import-from #:tui/style #:style #:patch-style)
-  (:import-from #:tui/text
-                #:text-lines #:text-style #:text-alignment #:line-spans
-                #:line-style #:line-alignment)
+  (:import-from #:tui/text #:text-lines #:text-style #:text-alignment #:line-spans #:line-style
+                #:line-alignment)
   (:import-from #:tui/text/truncate #:line-truncation #:line-skip)
   (:import-from #:tui/text/wrap #:map-wrapped-lines)
   (:import-from #:tui/widgets/widget #:render)
-  (:import-from #:tui/widgets/draw #:clip-area #:style-region #:write-line-range #:as-text)
+  (:import-from #:tui/widgets/draw #:clip-area #:as-text)
+  (:import-from #:tui/buffer #:set-style-region)
+  (:import-from #:tui/buffer/text #:set-line-range)
   (:export #:paragraph
            #:paragraph-line-count))
 
@@ -102,13 +103,13 @@ Paragraph places it: centering rounds the halves of both widths down separately.
 
 (defmethod render ((paragraph paragraph) area buffer)
   (multiple-value-bind (x y width height) (clip-area area buffer)
-    (style-region buffer x y width height (paragraph-style paragraph))
+    (set-style-region buffer x y width height (paragraph-style paragraph))
     (render (paragraph-block paragraph) area buffer)
     (let ((block (paragraph-block paragraph)))
       (when block
         (setf (values x y width height) (block-inner-bounds block x y width height))))
     (when (and (plusp width) (plusp height))
-      (style-region buffer x y width height (paragraph-style paragraph))
+      (set-style-region buffer x y width height (paragraph-style paragraph))
       (if (paragraph-wrap paragraph)
           (draw-wrapped paragraph buffer x y width height)
           (draw-truncated paragraph buffer x y width height)))))
@@ -143,7 +144,7 @@ aligned by ALIGNMENT, in row Y from column X."
   (when (plusp width)
     (multiple-value-bind (end-span end-char row-width)
         (line-truncation line width :start-span start-span :start-char start-char)
-      (write-line-range buffer (+ x (line-offset alignment row-width width)) y line
+      (set-line-range buffer (+ x (line-offset alignment row-width width)) y line
                         start-span start-char end-span end-char width base-style))))
 
 (defun draw-wrapped (paragraph buffer x y width height)
@@ -164,7 +165,7 @@ aligned by ALIGNMENT, in row Y from column X."
                         (declare (type fixnum row-width))
                         (cond ((plusp skip) (decf skip))
                               ((< row height)
-                               (write-line-range buffer
+                               (set-line-range buffer
                                                  (+ x (line-offset alignment row-width width))
                                                  (+ y row) line start-span start-char
                                                  end-span end-char width base-style)

@@ -86,5 +86,6 @@ right half of a wide grapheme."
 continuation cells of wide graphemes. For tests and debugging."
   (loop for y from (buffer-y buffer) below (+ (buffer-y buffer) (buffer-height buffer))
         collect (with-output-to-string (out)
-                  (loop for x from (buffer-x buffer) below (+ (buffer-x buffer) (buffer-width buffer))
+                  (loop for x from (buffer-x buffer)
+                          below (+ (buffer-x buffer) (buffer-width buffer))
                         do (write-string (cell-grapheme buffer x y) out)))))

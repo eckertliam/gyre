@@ -14,9 +14,7 @@
                 #:+cluster-base+ #:+wide+ #:+uncertain+ #:+skip+ #:+always-update+
                 #:+diff-option-flags+ #:cluster-code-p #:cluster-string #:intern-cluster
                 #:cluster-count #:clear-clusters)
-  (:import-from #:tui/layout
-                #:make-rect #:rect-x #:rect-y #:rect-width #:rect-height #:rect-right
-                #:rect-bottom)
+  (:import-from #:tui/layout #:make-rect #:rect-x #:rect-y #:rect-width #:rect-height)
   (:import-from #:tui/style
                 #:style-fg #:style-bg #:style-underline-color #:apply-modifiers #:+reset+)
   (:import-from #:tui/width
@@ -46,6 +44,8 @@
            #:set-diff-option
            #:set-string
            #:set-style
+           #:set-style-region
+           #:clip-region
            #:fill-cells
            #:buffer-row-strings))
 
@@ -296,29 +296,50 @@ Return the number of columns used, counted from X."
 
 ;;; Areas
 
-(defun clip (buffer area)
-  "The rows and columns of AREA inside BUFFER: four values, left right top bottom."
-  (values (max (rect-x area) (buffer-x buffer))
-          (min (rect-right area) (buffer-right buffer))
-          (max (rect-y area) (buffer-y buffer))
-          (min (rect-bottom area) (+ (buffer-y buffer) (buffer-height buffer)))))
+(declaim (ftype (function (buffer fixnum fixnum fixnum fixnum)
+                          (values fixnum fixnum fixnum fixnum &optional))
+                clip-region))
+(defun clip-region (buffer x y width height)
+  "Return the part of the WIDTH × HEIGHT region at (X, Y) that lies inside BUFFER as four
+values X, Y, WIDTH and HEIGHT. WIDTH or HEIGHT is 0 when the region misses BUFFER."
+  (let ((left (max x (buffer-x buffer)))
+        (top (max y (buffer-y buffer)))
+        (right (min (+ x (max 0 width)) (buffer-right buffer)))
+        (bottom (min (+ y (max 0 height)) (+ (buffer-y buffer) (buffer-height buffer)))))
+    (values left top (max 0 (- right left)) (max 0 (- bottom top)))))
+
+(defmacro do-region-cells ((index buffer x y width height) &body body)
+  "Evaluate BODY with INDEX bound to each cell index of BUFFER inside the WIDTH × HEIGHT
+region at (X, Y)."
+  (let ((b (gensym "BUFFER")) (left (gensym "LEFT")) (top (gensym "TOP"))
+        (columns (gensym "COLUMNS")) (rows (gensym "ROWS")) (row (gensym "ROW"))
+        (column (gensym "COLUMN")))
+    `(let ((,b ,buffer))
+       (multiple-value-bind (,left ,top ,columns ,rows) (clip-region ,b ,x ,y ,width ,height)
+         (declare (type fixnum ,left ,top ,columns ,rows))
+         (loop for ,row of-type fixnum from ,top below (+ ,top ,rows)
+               do (loop for ,column of-type fixnum from ,left below (+ ,left ,columns)
+                        for ,index of-type fixnum = (cell-index ,b ,column ,row)
+                        do (progn ,@body)))))))
 
 (defmacro do-area-cells ((index buffer area) &body body)
   "Evaluate BODY with INDEX bound to each cell index of BUFFER inside the rect AREA."
-  (let ((b (gensym "BUFFER")) (left (gensym "LEFT")) (right (gensym "RIGHT"))
-        (top (gensym "TOP")) (bottom (gensym "BOTTOM")) (y (gensym "Y")) (x (gensym "X")))
-    `(let ((,b ,buffer))
-       (multiple-value-bind (,left ,right ,top ,bottom) (clip ,b ,area)
-         (declare (type fixnum ,left ,right ,top ,bottom))
-         (loop for ,y of-type fixnum from ,top below ,bottom
-               do (loop for ,x of-type fixnum from ,left below ,right
-                        for ,index of-type fixnum = (cell-index ,b ,x ,y)
-                        do (progn ,@body)))))))
+  (let ((a (gensym "AREA")))
+    `(let ((,a ,area))
+       (do-region-cells (,index ,buffer (rect-x ,a) (rect-y ,a) (rect-width ,a) (rect-height ,a))
+         ,@body))))
+
+(defun set-style-region (buffer x y width height style)
+  "Patch the style of every cell of BUFFER in the WIDTH × HEIGHT region at (X, Y) with
+STYLE, like SET-STYLE without a rect."
+  (when style
+    (do-region-cells (index buffer x y width height)
+      (apply-style-at buffer index style))))
 
 (defun set-style (buffer area style)
   "Patch the style of every cell of BUFFER inside the rect AREA with STYLE."
-  (do-area-cells (index buffer area)
-    (apply-style-at buffer index style)))
+  (set-style-region buffer (rect-x area) (rect-y area) (rect-width area) (rect-height area)
+                    style))
 
 (defun set-diff-option (buffer area option)
   "Set how the diff treats the cells of BUFFER inside AREA: :none (draw when changed),
@@ -346,8 +367,10 @@ right edge becomes a space."
   (multiple-value-bind (string width) (grapheme-designator grapheme)
     (let ((code (grapheme-code buffer string 0 (length string)))
           (uncertain (uncertain-width-p string 0 (length string))))
-      (multiple-value-bind (left right top bottom) (clip buffer area)
-        (loop for y from top below bottom
+      (multiple-value-bind (left top columns rows)
+          (clip-region buffer (rect-x area) (rect-y area) (rect-width area) (rect-height area))
+        (loop with right = (+ left columns)
+              for y from top below (+ top rows)
               do (loop with x = left
                        while (< x right)
                        do (let ((index (cell-index buffer x y))

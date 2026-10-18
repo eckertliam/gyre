@@ -25,6 +25,8 @@
 
 (in-package #:tui/rect)
 
+;; Inline so that a DYNAMIC-EXTENT rect from MAKE-RECT can live on the stack.
+(declaim (inline %make-rect))
 (defstruct (rect (:constructor %make-rect (x y width height))
                  (:predicate rectp)
                  (:copier nil))
