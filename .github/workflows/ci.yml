@@ -1,9 +1,9 @@
 name: CI
 
+# Every push, so a pull request's head commit is checked too.
 on:
   push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
