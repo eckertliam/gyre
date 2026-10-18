@@ -135,3 +135,17 @@
         (dolist (s strings)
           (setf *sink* (string-width s))))
       (is (= 0 (- (sb-ext:get-bytes-consed) before))))))
+
+;;; The property cache agrees with SB-UNICODE.
+
+(deftest cached-properties-match-sb-unicode
+  (let ((mismatches '()))
+    (loop for code from 0 below #x30000 by 7
+          for char = (code-char code)
+          unless (and (eq (tui/unicode:break-class char) (sb-unicode:grapheme-break-class char))
+                      (eq (tui/unicode:extended-pictographic-p char)
+                          (and (sb-unicode:proplist-p char :extended-pictographic) t))
+                      (eq (tui/unicode:emoji-p char)
+                          (and (sb-unicode:proplist-p char :emoji) t)))
+            do (push code mismatches))
+    (is (null mismatches))))

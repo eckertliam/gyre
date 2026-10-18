@@ -6,6 +6,7 @@
 
 (defpackage #:tui/width
   (:use #:cl)
+  (:import-from #:tui/unicode #:char-width #:break-class #:extended-pictographic-p #:emoji-p)
   (:export #:char-width
            #:grapheme-end
            #:grapheme-width
@@ -22,38 +23,7 @@
   (declare (type fixnum code))
   (or (< code #x20) (<= #x7F code #x9F)))
 
-(defun wide-code-p (char)
-  (or (member (sb-unicode:east-asian-width char) '(:w :f))
-      (sb-unicode:proplist-p char :emoji-presentation)))
-
-(defun zero-width-code-p (char)
-  (let ((code (char-code char)))
-    (or (member (sb-unicode:general-category char) '(:mn :me :cf))
-        ;; Hangul Jungseong and Jongseong Jamo combine with a preceding Choseong.
-        (<= #x1160 code #x11FF)
-        (<= #xD7B0 code #xD7FF))))
-
-(declaim (ftype (function (character) (values (integer 0 2) &optional)) char-width))
-(defun char-width (char)
-  "Return how many columns CHAR occupies on its own: 0 for control characters, combining
-marks and other zero-width characters, 2 for East Asian wide and full-width characters and
-emoji with default emoji presentation, and 1 otherwise."
-  (let ((code (char-code char)))
-    (cond ((control-code-p code) 0)
-          ((< code #x7F) 1)
-          ((= code #xAD) 1)              ; soft hyphen, drawn by terminals
-          ((zero-width-code-p char) 0)
-          ((wide-code-p char) 2)
-          (t 1))))
-
 ;;; Grapheme cluster boundaries
-
-(declaim (inline break-class))
-(defun break-class (char)
-  (sb-unicode:grapheme-break-class char))
-
-(defun extended-pictographic-p (char)
-  (sb-unicode:proplist-p char :extended-pictographic))
 
 (defun hangul-continues-p (c1 c2)
   ;; GB6–GB8: Hangul syllable sequences stay together.
@@ -129,8 +99,7 @@ looking no further than END. START must be a cluster boundary below END."
           (t
            (loop for index from (1+ start) below end
                  for c = (char-code (schar string index))
-                 do (cond ((and (= c #xFE0F) (= width 1)
-                                (sb-unicode:proplist-p base :emoji))
+                 do (cond ((and (= c #xFE0F) (= width 1) (emoji-p base))
                            ;; VS16 asks for emoji presentation, which is wide.
                            (setf width 2))
                           ((or (= c #xFF9E) (= c #xFF9F))
