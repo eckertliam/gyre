@@ -99,6 +99,18 @@ that changes 10%, and one that doesn't change."
          (styles (make-styles state)))
     (format t "~&Benchmark: ~D×~D buffer (ASCII, CJK, emoji, 24-bit colors), ~
                output written to /dev/null~%" +columns+ +rows+)
+    (let ((frame-buffer (tui/buffer:make-buffer (tui/layout:make-rect 0 0 +columns+ +rows+)))
+          (start (get-internal-real-time)))
+      ;; What the application's render function costs on its own, without diffing or output.
+      (dotimes (i 2000)
+        (tui/buffer:reset-buffer frame-buffer)
+        (dotimes (y +rows+)
+          (set-string frame-buffer 0 y (aref lines y) :style (aref styles (mod y 16)))))
+      (format t "  ~12A ~8,1F µs/frame  (reset-buffer + SET-STRING for every row; ~
+                 included in the times below)~%"
+              "render only"
+              (/ (* 1000000.0 (- (get-internal-real-time) start)) internal-time-units-per-second
+                 2000)))
     (loop for (name function frames) in '(("full redraw" full-redraw 300)
                                           ("10% change" partial-change 2000)
                                           ("unchanged" no-change 2000))

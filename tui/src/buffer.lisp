@@ -264,6 +264,69 @@ doesn't fit before the right edge, are ignored."
 
 ;;; Strings
 
+(deftype half-index ()
+  "A cell index or offset small enough that the sum of two is still an array index."
+  `(integer 0 (,(floor array-total-size-limit 2))))
+
+(declaim (inline put-narrow))
+(defun put-narrow (buffer index column code base-style style)
+  "PUT-GRAPHEME for a single code point one column wide, patched with BASE-STYLE then STYLE."
+  (declare (type buffer buffer) (type fixnum index column) (type (unsigned-byte 32) code))
+  (let ((codes (buffer-codes buffer))
+        (flags (buffer-flags buffer)))
+    (when (and (= (aref codes index) +continuation+) (plusp column))
+      (blank-cell buffer (1- index)))
+    (when (and (logtest (aref flags index) +wide+) (< (1+ column) (buffer-width buffer)))
+      (blank-cell buffer (1+ index)))
+    (setf (aref codes index) code
+          (aref flags index) (logand (aref flags index) +diff-option-flags+))
+    (apply-style-at buffer index base-style)
+    (apply-style-at buffer index style)))
+
+(declaim (ftype (function (buffer fixnum fixnum simple-string fixnum fixnum fixnum t t)
+                          (values fixnum &optional))
+                write-graphemes))
+(defun write-graphemes (buffer x y string start end limit base-style style)
+  "Write the grapheme clusters of STRING from START to END into row Y from column X, up to
+column LIMIT, as SET-STRING describes. Return the column after the last one written."
+  (declare (optimize speed))
+  (let* ((left (buffer-x buffer))
+         (row-start (* (- y (buffer-y buffer)) (buffer-width buffer)))
+         (column x)
+         (i start))
+    (declare (type fixnum left column i) (type half-index row-start))
+    (loop while (< i end)
+          do (let ((code (char-code (schar string i)))
+                   (next (1+ i)))
+               (declare (type fixnum next))
+               (if (and (< #x1F code #x7F)
+                        (or (= next end) (< (char-code (schar string next)) #x80)))
+                   ;; Printable ASCII followed by ASCII: one cluster, one column.
+                   (progn
+                     (when (>= column limit) (return))
+                     (when (>= column left)
+                       (let ((offset (- column left)))
+                         (declare (type half-index offset))
+                         (put-narrow buffer (+ row-start offset) offset code base-style style)))
+                     (setf column (1+ column) i next))
+                   (let* ((cluster-end (grapheme-end string i end))
+                          (width (grapheme-width string i cluster-end)))
+                     (unless (zerop width)
+                       (when (> (+ column width) limit) (return))
+                       (when (>= column left)
+                         (let* ((offset (- column left))
+                                (index (+ row-start offset)))
+                           (declare (type half-index offset))
+                           (put-grapheme buffer index offset
+                                         (grapheme-code buffer string i cluster-end) width
+                                         (and (= width 2)
+                                              (uncertain-width-p string i cluster-end))
+                                         base-style)
+                           (apply-style-at buffer index style)))
+                       (setf column (+ column width)))
+                     (setf i cluster-end)))))
+    column))
+
 (defun set-string (buffer x y string &key style base-style max-width (start 0) end)
   "Write STRING (from START to END) into row Y of BUFFER starting at column X, one grapheme
 cluster per cell (two for wide ones), patching each cell's style with BASE-STYLE and then
@@ -274,22 +337,12 @@ Return the number of columns used, counted from X."
   (declare (type fixnum x y start))
   (let* ((string (if (simple-string-p string) string (coerce string 'simple-string)))
          (right (buffer-right buffer))
-         (limit (if max-width (min right (+ x max-width)) right))
-         (column x))
-    (declare (type simple-string string) (type fixnum right limit column))
-    (when (cell-index buffer (buffer-x buffer) y) ; the row is inside the buffer
-      (do-graphemes ((s e width) string :start start :to end)
-        (unless (zerop width)
-          (when (> (+ column width) limit)
-            (return))
-          (when (>= column (buffer-x buffer))
-            (let ((index (cell-index buffer column y)))
-              (put-grapheme buffer index (- column (buffer-x buffer))
-                            (grapheme-code buffer string s e) width
-                            (and (= width 2) (uncertain-width-p string s e)) base-style)
-              (apply-style-at buffer index style)))
-          (incf column width))))
-    (- column x)))
+         (limit (if max-width (min right (+ x max-width)) right)))
+    (if (cell-index buffer (buffer-x buffer) y) ; the row is inside the buffer
+        (- (write-graphemes buffer x y string start (or end (length string)) limit
+                            base-style style)
+           x)
+        0)))
 
 ;;; Areas
 

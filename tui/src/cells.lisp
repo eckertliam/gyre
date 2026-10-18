@@ -65,7 +65,8 @@ codes below it are single code points.")
 ;;; Looking up a grapheme that is already present doesn't allocate.
 
 (defstruct (clusters (:constructor make-clusters ()) (:copier nil))
-  (strings (make-array 8 :adjustable t :fill-pointer 0) :type (and vector (not simple-array)))
+  (strings (make-array 8 :adjustable t :fill-pointer 0)
+   :type (and (vector t) (not simple-array)))
   (slots (make-array 32 :element-type 'fixnum :initial-element -1)
    :type (simple-array fixnum (*))))
 
@@ -111,7 +112,9 @@ codes below it are single code points.")
             then (logand (1+ slot) mask)
           for index of-type fixnum = (aref slots slot)
           do (cond ((= index -1)
-                    (let ((new (vector-push-extend (subseq string start end) strings)))
+                    (let ((new (vector-push-extend (replace (make-string (- end start)) string
+                                                            :start2 start :end2 end)
+                                                   strings)))
                       (setf (aref slots slot) new)
                       (when (> (* 2 (fill-pointer strings)) (length slots))
                         (rehash clusters))
@@ -178,7 +181,8 @@ arrays when the cell count is unchanged."
 (defun cluster-string (buffer code)
   "The grapheme string for the cluster code CODE of BUFFER."
   (declare (type buffer buffer) (type (unsigned-byte 32) code))
-  (aref (clusters-strings (buffer-clusters buffer)) (- code +cluster-base+)))
+  (the (simple-array character (*))
+       (aref (clusters-strings (buffer-clusters buffer)) (- code +cluster-base+))))
 
 (declaim (inline same-grapheme-p))
 (defun same-grapheme-p (a code-a b code-b)

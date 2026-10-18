@@ -11,7 +11,7 @@
                 #:buffer #:buffer-x #:buffer-y #:buffer-width #:buffer-height #:buffer-codes
                 #:buffer-fgs #:buffer-bgs #:buffer-underline-colors #:buffer-modifier-sets
                 #:buffer-flags #:+continuation+ #:+wide+ #:+uncertain+ #:+skip+
-                #:+always-update+ #:cluster-code-p #:cluster-string #:same-cell-p)
+                #:+always-update+ #:cluster-code-p #:cluster-string #:same-grapheme-p)
   (:import-from #:tui/output
                 #:output #:output-byte #:output-csi #:output-decimal #:output-char
                 #:output-string #:output-fill)
@@ -151,9 +151,16 @@ after a semicolon."
     (setf (pen-fg pen) +reset+ (pen-bg pen) +reset+ (pen-underline-color pen) +reset+
           (pen-modifiers pen) 0)))
 
+(declaim (inline set-pen))
 (defun set-pen (output pen fg bg underline-color modifiers)
   "Make the terminal's SGR attributes FG, BG, UNDERLINE-COLOR and MODIFIERS, emitting only
 what differs from PEN."
+  (declare (type output output) (type pen pen) (type fixnum fg bg underline-color modifiers))
+  (unless (and (= fg (pen-fg pen)) (= bg (pen-bg pen))
+               (= underline-color (pen-underline-color pen)) (= modifiers (pen-modifiers pen)))
+    (change-pen output pen fg bg underline-color modifiers)))
+
+(defun change-pen (output pen fg bg underline-color modifiers)
   (declare (type output output) (type pen pen) (type fixnum fg bg underline-color modifiers))
   (if (and (= fg +reset+) (= bg +reset+) (= underline-color +reset+) (zerop modifiers))
       (write-sgr-reset output pen)
@@ -170,6 +177,7 @@ what differs from PEN."
         (setf (pen-fg pen) fg (pen-bg pen) bg (pen-underline-color pen) underline-color
               (pen-modifiers pen) modifiers))))
 
+(declaim (inline set-pen-to-cell))
 (defun set-pen-to-cell (output pen buffer index)
   (declare (type buffer buffer) (type fixnum index))
   (set-pen output pen
@@ -180,6 +188,7 @@ what differs from PEN."
 
 ;;; Cells
 
+(declaim (inline advance))
 (defun advance (pen columns right)
   "Account for writing COLUMNS columns at the cursor in a row ending at column RIGHT. At the
 right edge the cursor's position becomes unknown (terminals differ on pending wraps)."
@@ -197,7 +206,7 @@ right edge the cursor's position becomes unknown (terminals differ on pending wr
 
 (defun write-cell (output pen buffer index x y)
   "Draw cell INDEX of BUFFER, which is at screen column X, row Y."
-  (declare (type buffer buffer) (type fixnum index x y))
+  (declare (type buffer buffer) (type fixnum index x y) (optimize speed))
   (let* ((flags (aref (buffer-flags buffer) index))
          (wide (logtest flags +wide+))
          (right (+ (buffer-x buffer) (buffer-width buffer))))
@@ -215,29 +224,63 @@ right edge the cursor's position becomes unknown (terminals differ on pending wr
         (setf (pen-x pen) -1 (pen-y pen) -1)
         (advance pen (if wide 2 1) right))))
 
+(defmacro with-cell-arrays ((buffer &rest bindings) &body body)
+  "Bind each (variable reader) of BINDINGS to the array READER returns for BUFFER, declared
+as the array type it is, around BODY."
+  (let ((b (gensym "BUFFER")))
+    `(let* ((,b ,buffer)
+            ,@(loop for (variable reader) in bindings
+                    collect `(,variable (,reader ,b))))
+       (declare (type (simple-array (unsigned-byte 32) (*))
+                      ,@(loop for (variable reader) in bindings
+                              unless (member reader '(buffer-modifier-sets buffer-flags))
+                                collect variable))
+                (type (simple-array (unsigned-byte 16) (*))
+                      ,@(loop for (variable reader) in bindings
+                              when (eq reader 'buffer-modifier-sets) collect variable))
+                (type (simple-array (unsigned-byte 8) (*))
+                      ,@(loop for (variable reader) in bindings
+                              when (eq reader 'buffer-flags) collect variable)))
+       ,@body)))
+
 (defun write-diff (output pen previous next)
   "Append to OUTPUT what turns a terminal showing PREVIOUS into one showing NEXT: every
 cell of NEXT that differs from PREVIOUS or is marked :always-update, except cells marked
 :skip and the continuation cells of wide graphemes, which are drawn with their grapheme.
 The buffers must cover the same area. PEN tracks the terminal's cursor and SGR state;
 attributes are left as they are, see WRITE-SGR-RESET."
-  (declare (type output output) (type pen pen) (type buffer previous next))
-  (let ((width (buffer-width next))
-        (codes (buffer-codes next))
-        (flags (buffer-flags next)))
-    (declare (type fixnum width))
-    (dotimes (row (buffer-height next))
-      (let ((base (* row width))
-            (column 0))
-        (declare (type fixnum base column))
-        (loop while (< column width)
-              do (let* ((index (+ base column))
-                        (cell-flags (aref flags index)))
-                   (cond ((logtest cell-flags +skip+) (incf column))
-                         ((= (aref codes index) +continuation+) (incf column))
-                         (t
-                          (when (or (logtest cell-flags +always-update+)
-                                    (not (same-cell-p previous index next index)))
-                            (write-cell output pen next index
-                                        (+ column (buffer-x next)) (+ row (buffer-y next))))
-                          (incf column (if (logtest cell-flags +wide+) 2 1))))))))))
+  (declare (type output output) (type pen pen) (type buffer previous next)
+           (optimize speed))
+  (assert (= (length (buffer-codes previous)) (length (buffer-codes next))))
+  (with-cell-arrays (next (codes buffer-codes) (fgs buffer-fgs) (bgs buffer-bgs)
+                          (underlines buffer-underline-colors)
+                          (modifiers buffer-modifier-sets) (flags buffer-flags))
+    (with-cell-arrays (previous (old-codes buffer-codes) (old-fgs buffer-fgs)
+                                (old-bgs buffer-bgs) (old-underlines buffer-underline-colors)
+                                (old-modifiers buffer-modifier-sets))
+      (let ((width (buffer-width next))
+            (x (buffer-x next))
+            (y (buffer-y next)))
+        (declare (type (integer 0 #.(floor array-total-size-limit 2)) width)
+                 (type fixnum x y))
+        (dotimes (row (buffer-height next))
+          (let ((base (* row width))
+                (column 0))
+            (declare (type (integer 0 #.(floor array-total-size-limit 2)) base column))
+            (loop while (< column width)
+                  do (let* ((index (+ base column))
+                            (cell-flags (aref flags index))
+                            (code (aref codes index)))
+                       (cond ((logtest cell-flags +skip+) (incf column))
+                             ((= code +continuation+) (incf column))
+                             (t
+                              (when (or (logtest cell-flags +always-update+)
+                                        (/= (aref fgs index) (aref old-fgs index))
+                                        (/= (aref bgs index) (aref old-bgs index))
+                                        (/= (aref underlines index) (aref old-underlines index))
+                                        (/= (aref modifiers index) (aref old-modifiers index))
+                                        (not (same-grapheme-p previous (aref old-codes index)
+                                                              next code)))
+                                (write-cell output pen next index
+                                            (+ column x) (+ row y)))
+                              (incf column (if (logtest cell-flags +wide+) 2 1))))))))))))
