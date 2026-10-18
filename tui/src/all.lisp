@@ -5,6 +5,9 @@
   (:use-reexport #:tui/style
                  #:tui/width
                  #:tui/text
+                 #:tui/text/range
+                 #:tui/text/truncate
+                 #:tui/text/wrap
                  #:tui/layout
                  #:tui/buffer
                  #:tui/input
