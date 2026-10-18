@@ -34,6 +34,12 @@
                (:file "caps")
                (:file "render")
                (:file "widgets")
+               (:file "widgets-block")
+               (:file "widgets-paragraph")
+               (:file "widgets-list")
+               (:file "widgets-table")
+               (:file "widgets-tabs")
+               (:file "widgets-alloc")
                (:file "bench"))
   :perform (test-op (o c) (uiop:symbol-call '#:tui/tests/harness '#:run-tests)))
 
