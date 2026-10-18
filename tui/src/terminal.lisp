@@ -88,9 +88,10 @@ disambiguate escape codes (1) and report alternate keys (4), as Helix does.")
 single write(2), and empty the buffer."
   (let ((output (terminal-output terminal)))
     (when (plusp (output-fill output))
-      (write-octets (terminal-output-fd terminal) (output-octets output)
-                    :end (output-fill output))
-      (reset-output output))
+      ;; Empty the buffer even when the write fails, so a dead terminal can't make it grow.
+      (unwind-protect (write-octets (terminal-output-fd terminal) (output-octets output)
+                                    :end (output-fill output))
+        (reset-output output)))
     terminal))
 
 (defun emit (terminal &rest sequences)
@@ -184,9 +185,10 @@ form entered raw mode."
 
 (defun enter (terminal)
   (enter-raw terminal)
+  ;; Entered from here on, so that a failure below still gets the terminal restored.
+  (setf (terminal-state terminal) :entered)
   (write-enter-sequences terminal)
-  (flush-output terminal)
-  (setf (terminal-state terminal) :entered))
+  (flush-output terminal))
 
 (defun leave (terminal state)
   ;; Restore termios even when writing the escape sequences fails.
@@ -222,8 +224,11 @@ and popped on exit."
        (progn
          (enter terminal)
          (funcall function))
-    (unless (eq (terminal-state terminal) :idle)
-      (leave terminal :idle))))
+    (ecase (terminal-state terminal)
+      (:entered (leave terminal :idle))
+      ;; SUSPEND already restored the terminal.
+      (:suspended (setf (terminal-state terminal) :idle))
+      (:idle (leave-raw terminal)))))
 
 (defmacro with-terminal ((terminal &rest options &key mouse kitty-keyboard) &body body)
   "Evaluate BODY with TERMINAL set up for a full-screen application and restore it

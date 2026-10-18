@@ -170,3 +170,16 @@
           (is (= (char-code #\x) (aref octets 0)))
           (is (not (wait-for-input tb 0.05)))))
       (is (not (raw-mode-p (pty-slave a)))))))
+
+(deftest leaving-while-suspended-restores-nothing-twice
+  (with-pty (a 80 24)
+    (let ((ta (make-terminal (pty-slave a))))
+      (with-terminal (ta)
+        (suspend ta)
+        (drain-pty a))
+      (is (not (terminal-entered-p ta)))
+      (is (not (raw-mode-p (pty-slave a))))
+      (is (zerop (length (read-pty a :timeout 0.1))))
+      ;; The terminal can be entered again.
+      (with-terminal (ta)
+        (is (raw-mode-p (pty-slave a)))))))
