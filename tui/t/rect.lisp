@@ -5,7 +5,7 @@
   (:import-from #:tui/tests/harness #:deftest #:is #:signals)
   (:import-from #:tui/rect
                 #:rect
-                #:rect-p
+                #:rectp
                 #:make-rect
                 #:rect-x
                 #:rect-y
@@ -31,7 +31,7 @@
 
 (deftest rect-accessors
   (let ((rect (r 1 2 3 4)))
-    (is (rect-p rect))
+    (is (rectp rect))
     (is (typep rect 'rect))
     (is (equal '(1 2 3 4 4 6 12)
                (list (rect-x rect) (rect-y rect) (rect-width rect) (rect-height rect)

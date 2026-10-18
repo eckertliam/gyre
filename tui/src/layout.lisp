@@ -5,7 +5,7 @@
   (:use #:cl)
   (:import-from #:tui/rect
                 #:rect
-                #:rect-p
+                #:rectp
                 #:make-rect
                 #:rect-x
                 #:rect-y
@@ -37,7 +37,7 @@
   (:export
    ;; Rects, from tui/rect.
    #:rect
-   #:rect-p
+   #:rectp
    #:make-rect
    #:rect-x
    #:rect-y
@@ -59,7 +59,7 @@
    #:invalid-constraint
    #:invalid-constraint-designator
    #:layout
-   #:layout-p
+   #:layoutp
    #:make-layout
    #:layout-direction
    #:layout-constraints
@@ -70,6 +70,7 @@
 
 (defstruct (layout (:constructor %make-layout
                        (direction constraints horizontal-margin vertical-margin solver))
+                   (:predicate layoutp)
                    (:copier nil))
   "A way of dividing a rect into areas: a direction, one constraint per area, a flex mode,
 spacing and margins. Make one with MAKE-LAYOUT and divide rects with SPLIT. A layout's

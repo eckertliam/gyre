@@ -3,7 +3,7 @@
 (defpackage #:tui/input/event
   (:use #:cl)
   (:export #:+shift+ #:+alt+ #:+ctrl+ #:+super+ #:+hyper+ #:+meta+ #:+caps-lock+ #:+num-lock+
-           #:event #:event-p
+           #:event #:eventp
            #:key-event #:make-key-event #:key-event-p #:key-event-key #:key-event-modifiers
            #:key-event-kind #:key-event-shifted-key #:key-event-base-layout-key
            #:key-event-text #:key-event-keypad #:key-event=
@@ -37,7 +37,7 @@
 
 ;;; Events
 
-(defstruct (event (:constructor nil) (:copier nil))
+(defstruct (event (:constructor nil) (:predicate eventp) (:copier nil))
   "Base type of everything the input decoder returns, and of RESIZE-EVENT.")
 
 (defstruct (key-event (:include event) (:copier nil))

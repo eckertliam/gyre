@@ -126,8 +126,9 @@ seconds for the first byte and then until no more arrives for 20 ms."
 
 (defun octets-string (octets)
   "OCTETS decoded as UTF-8, with ESC shown as ~."
-  (substitute #\~ (code-char 27) (sb-ext:octets-to-string (coerce octets '(vector (unsigned-byte 8)))
-                                                          :external-format :utf-8)))
+  (substitute #\~ (code-char 27)
+              (sb-ext:octets-to-string (coerce octets '(vector (unsigned-byte 8)))
+                                       :external-format :utf-8)))
 
 (defun search-octets (needle haystack)
   "True when the octets of the string NEEDLE (with ~ for ESC) occur in HAYSTACK."

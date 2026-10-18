@@ -28,7 +28,8 @@
 
 (defun make-styles (state)
   (coerce (loop repeat 16
-                collect (make-style :fg (rgb (random 256 state) (random 256 state) (random 256 state))
+                collect (make-style :fg (rgb (random 256 state) (random 256 state)
+                                             (random 256 state))
                                     :bg (random 16 state)
                                     :modifiers (if (zerop (random 4 state)) :bold 0)))
           'vector))

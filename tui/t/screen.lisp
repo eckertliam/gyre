@@ -33,7 +33,8 @@
 
 (define-condition unexpected-output (error)
   ((message :initarg :message :reader unexpected-output-message))
-  (:report (lambda (c s) (format s "Unexpected terminal output: ~A" (unexpected-output-message c)))))
+  (:report (lambda (c s)
+             (format s "Unexpected terminal output: ~A" (unexpected-output-message c)))))
 
 (defun unexpected (control &rest arguments)
   (error 'unexpected-output :message (apply #'format nil control arguments)))

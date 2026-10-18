@@ -29,20 +29,38 @@ versions and no compatibility promises.
 ## Build and run
 
 - SBCL is installed via Homebrew.
-- Build an executable: `sbcl --non-interactive --eval '(asdf:make "gyre")'`
-- Run tests: `sbcl --non-interactive --eval '(asdf:test-system "gyre")'`
+- `make test` (at the repo root) compiles every system from scratch, examples
+  included, and runs all tests. It fails on any warning or style warning.
+- `make bench` prints the drawing benchmark. `make inspector` and `make demo`
+  run the `tui` examples in the current terminal.
+- The Makefile configures ASDF for each SBCL invocation only: it sees the
+  repo's `.asd` files (plus SBCL's contribs) and writes fasls under `build/`.
+  No global ASDF, Quicklisp or init-file setup is involved. To work in a REPL,
+  start SBCL with the same `--eval` forms as `LISP` in the Makefile and load
+  systems with `asdf:load-system`.
 - Development is REPL-driven: load the system into a running image and
   redefine functions in place rather than doing full rebuilds.
 
 ## Project layout
 
-- `gyre.asd` uses `:class :package-inferred-system`. Each file is its own
-  package named after its path (`gyre/term/input` lives in
-  `src/term/input.lisp`), and ASDF derives dependencies from `defpackage`.
-- `gyre.asd` contains only system definitions: no other code and no changes to
-  ASDF's configuration.
-- Tests live in `t/` and mirror the `src/` layout, defined by a separate
-  `gyre/tests` system.
+- The repo is a monorepo with one folder per ASDF system. `tui/` is the
+  terminal UI library. The editor will get its own folder later and depend on
+  `tui`; `tui` never depends on anything else in the repo.
+- Each system's `.asd` (e.g. `tui/tui.asd`) uses `:class
+  :package-inferred-system` with sources in `<folder>/src/`. Each file is its
+  own package named after its path (`tui/input/decoder` lives in
+  `tui/src/input/decoder.lisp`), and ASDF derives dependencies from
+  `defpackage`. ASDF 3.3's package inference rejects `:local-nicknames`, so
+  these packages can't use them.
+- A system's public API is one package that re-exports its modules: `tui` is
+  defined in `tui/src/all.lisp` with `uiop:define-package` and
+  `:use-reexport`, so users write `tui:draw`.
+- `.asd` files contain only system definitions: no other code and no changes
+  to ASDF's configuration.
+- Tests live in `<folder>/t/` and mirror the `src/` layout, in a separate
+  `<system>/tests` system (`tui/tests`). They use the minimal harness in
+  `tui/t/harness.lisp` (`deftest`, `is`, `signals` and a runner). Examples
+  live in `<folder>/examples/` (`tui/examples`).
 
 ## Architecture
 
@@ -167,7 +185,8 @@ this project.
   Name things by intent, not by type (`lines`, not `line-list`). No package
   prefixes in symbol names.
 - **Packages:** one per file. Use `:import-from` instead of `:use` (except
-  `:cl`). Use `:local-nicknames` for long package names. No `::` into another
+  `:cl`). Use `:local-nicknames` for long package names, except in
+  package-inferred systems, where ASDF rejects them. No `::` into another
   package outside tests.
 - **Formatting:** spaces, 2-space bodies, standard SLIME-style indentation,
   lines up to 100 columns, no closing parens on their own lines. Keep
@@ -240,7 +259,6 @@ optimizing.
 
 ## Open decisions
 
-- Test framework (FiveAM or Parachute).
 - Text representation (rope or piece table).
 - Syntax highlighting (tree-sitter through `sb-alien`, or our own).
 - License.

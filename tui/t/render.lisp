@@ -75,7 +75,8 @@
 (deftest sgr-only-when-the-style-changes
   (is (string= "~[1;1Ha~[1mb~[0m"
                (diff-string (blank 3 1)
-                            (buffer-with 3 1 '(0 0 "a") (list 1 0 "b" (make-style :modifiers :bold))))))
+                            (buffer-with 3 1 '(0 0 "a")
+                                         (list 1 0 "b" (make-style :modifiers :bold))))))
   (is (string= "~[1;1H~[31mab~[0m"
                (diff-string (blank 3 1) (buffer-with 3 1 (list 0 0 "ab" (make-style :fg :red)))))))
 
@@ -96,8 +97,10 @@
 (deftest underline-style-and-color-are-separate-sequences
   (is (string= "~[1;1H~[4:3m~[58:2::1:2:3mx~[0m"
                (diff-string (blank 1 1)
-                            (buffer-with 1 1 (list 0 0 "x" (make-style :modifiers :curly-underline
-                                                                       :underline-color (rgb 1 2 3))))))))
+                            (buffer-with 1 1
+                                         (list 0 0 "x"
+                                               (make-style :modifiers :curly-underline
+                                                           :underline-color (rgb 1 2 3))))))))
 
 (deftest wide-graphemes-advance-two-columns
   (is (string= (str "~[1;1H" #x65E5 "x")
@@ -173,7 +176,8 @@ mismatches after each step, and the skip cells of NEXT that changed."
 
 (defparameter *pieces*
   (vector "a" "b" "x" " " "-" (str #x65E5) (str #x672C) (str #x1F600) (str #x2764 #xFE0F)
-          (str "e" #x301) (str #x1F1FA #x1F1F8) (str #x2500) (str #xE9) (str #x1F468 #x200D #x1F469))
+          (str "e" #x301) (str #x1F1FA #x1F1F8) (str #x2500) (str #xE9)
+          (str #x1F468 #x200D #x1F469))
   "Graphemes for random buffers: narrow, wide, VS16, combining, flags and ZWJ sequences.")
 
 (defun random-element (vector state)
@@ -288,7 +292,8 @@ wide grapheme straddles the edge of the skipped rect."
       (is (string= "~[2;4H~[6 q~[?25h"
                    (frame-output pty terminal (lambda (frame) (set-cursor frame 3 1 :bar)))))
       (is (string= "" (frame-output pty terminal (lambda (frame) (set-cursor frame 3 1 :bar)))))
-      (is (string= "~[1;1H" (frame-output pty terminal (lambda (frame) (set-cursor frame 0 0 :bar)))))
+      (is (string= "~[1;1H"
+                   (frame-output pty terminal (lambda (frame) (set-cursor frame 0 0 :bar)))))
       (is (string= "~[?25l" (frame-output pty terminal #'hide-cursor))))))
 
 (deftest synchronized-output-wraps-frames

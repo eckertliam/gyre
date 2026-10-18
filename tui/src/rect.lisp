@@ -4,7 +4,7 @@
 (defpackage #:tui/rect
   (:use #:cl)
   (:export #:rect
-           #:rect-p
+           #:rectp
            #:make-rect
            #:rect-x
            #:rect-y
@@ -26,6 +26,7 @@
 (in-package #:tui/rect)
 
 (defstruct (rect (:constructor %make-rect (x y width height))
+                 (:predicate rectp)
                  (:copier nil))
   "A rectangle of terminal cells: columns X to X+WIDTH-1 of rows Y to Y+HEIGHT-1. X and Y are
 fixnums and may be negative; WIDTH and HEIGHT are non-negative fixnums. A rect is an immutable
