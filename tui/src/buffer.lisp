@@ -264,12 +264,13 @@ doesn't fit before the right edge, are ignored."
 
 ;;; Strings
 
-(defun set-string (buffer x y string &key style max-width (start 0) end)
+(defun set-string (buffer x y string &key style base-style max-width (start 0) end)
   "Write STRING (from START to END) into row Y of BUFFER starting at column X, one grapheme
-cluster per cell (two for wide ones), patching each cell's style with STYLE. Control
-characters and other zero-width clusters are skipped. Writing stops at the buffer's right
-edge, after MAX-WIDTH columns, or before a wide cluster that wouldn't fit; columns left of
-the buffer are clipped. Return the number of columns used, counted from X."
+cluster per cell (two for wide ones), patching each cell's style with BASE-STYLE and then
+STYLE (as if with their PATCH-STYLE, without allocating it). Control characters and other
+zero-width clusters are skipped. Writing stops at the buffer's right edge, after MAX-WIDTH
+columns, or before a wide cluster that wouldn't fit; columns left of the buffer are clipped.
+Return the number of columns used, counted from X."
   (declare (type fixnum x y start))
   (let* ((string (if (simple-string-p string) string (coerce string 'simple-string)))
          (right (buffer-right buffer))
@@ -282,9 +283,11 @@ the buffer are clipped. Return the number of columns used, counted from X."
           (when (> (+ column width) limit)
             (return))
           (when (>= column (buffer-x buffer))
-            (put-grapheme buffer (cell-index buffer column y) (- column (buffer-x buffer))
-                          (grapheme-code buffer string s e) width
-                          (and (= width 2) (uncertain-width-p string s e)) style))
+            (let ((index (cell-index buffer column y)))
+              (put-grapheme buffer index (- column (buffer-x buffer))
+                            (grapheme-code buffer string s e) width
+                            (and (= width 2) (uncertain-width-p string s e)) base-style)
+              (apply-style-at buffer index style)))
           (incf column width))))
     (- column x)))
 

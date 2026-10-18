@@ -10,6 +10,7 @@
                  #:tui/text/wrap
                  #:tui/layout
                  #:tui/buffer
+                 #:tui/buffer/text
                  #:tui/input
                  #:tui/terminal
                  #:tui/caps
