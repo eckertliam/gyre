@@ -1,0 +1,36 @@
+;;;; tui.asd — system definitions for tui, a terminal UI library.
+
+(defsystem "tui"
+  :description "A terminal UI library in the style of ratatui."
+  :class :package-inferred-system
+  :pathname "src"
+  :depends-on ("tui/all")
+  :in-order-to ((test-op (test-op "tui/tests"))))
+
+(defsystem "tui/tests"
+  :description "Tests and benchmarks for tui."
+  :depends-on ("tui" "sb-posix")
+  :pathname "t"
+  :serial t
+  :components ((:file "harness")
+               (:file "pty")
+               (:file "screen")
+               (:file "style")
+               (:file "width")
+               (:file "text")
+               (:file "layout")
+               (:file "buffer")
+               (:file "input")
+               (:file "terminal")
+               (:file "caps")
+               (:file "render")
+               (:file "widgets")
+               (:file "bench"))
+  :perform (test-op (o c) (uiop:symbol-call '#:tui/tests/harness '#:run-tests)))
+
+(defsystem "tui/examples"
+  :description "Example programs for tui."
+  :depends-on ("tui")
+  :pathname "examples"
+  :components ((:file "inspector")
+               (:file "demo")))

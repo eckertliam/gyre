@@ -1,0 +1,13 @@
+;;;; all.lisp — the public package TUI, which re-exports the public API of every module.
+
+(uiop:define-package #:tui/all
+  (:nicknames #:tui)
+  (:use-reexport #:tui/style
+                 #:tui/width
+                 #:tui/text
+                 #:tui/layout
+                 #:tui/buffer
+                 #:tui/input
+                 #:tui/terminal
+                 #:tui/caps
+                 #:tui/render))
