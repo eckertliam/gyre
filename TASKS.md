@@ -22,11 +22,11 @@ Deleted in the final commit; its contents go into the PR description.
 - [x] `tui/terminal`: terminal object (in/out fds), with-terminal, suspend/resume, size, one write per frame, wait helper
 - [x] `tui/caps`: query kitty keyboard + sync output, DA1 sentinel, blocking + non-blocking API, per-terminal results
 - [x] `tui/render`: draw/frame, double buffering, minimal diff, wide/VS16 handling, sync output, cursor, invalidate/resize, zero allocation
-- [ ] `tui/widgets`: render/render-stateful generics; block, paragraph, list, table, tabs, scrollbar, clear
+- [x] `tui/widgets`: render/render-stateful generics; block, paragraph, list, table, tabs, scrollbar, clear
 
 ## Examples
 - [x] Event inspector
-- [ ] Widget demo
+- [x] Widget demo
 
 ## Verification
 - [x] Decoder tables (all encodings, Alt, every modifier, kitty event types, mouse, paste)
@@ -50,8 +50,12 @@ Deleted in the final commit; its contents go into the PR description.
 - [x] Rename one-word struct predicates (`rectp`, `layoutp`, `eventp`)
 - [x] Split buffer.lisp (cell reading in `tui/buffer/read`, styled text in `tui/buffer/text`)
 - [x] ASCII fast path in set-string, hoisted arrays in the diff
-- [ ] Merge widgets; widget demo; demo smoke test
-- [ ] CI green on Linux and macOS
+- [x] Merge widgets; widget demo; demo smoke test
+- [x] CI green on Linux and macOS
+
+- [x] Move the widgets' region/line/text drawing into tui/buffer and tui/buffer/text
+- [x] Cache Unicode properties per code point (non-ASCII width ~3× faster)
+- [x] Restore the terminal when entering fails halfway or when exiting while suspended
 
 ## Finish
 - [ ] Review whole diff against CLAUDE.md and the issue; fix blockers

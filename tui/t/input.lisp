@@ -11,6 +11,7 @@
                 #:make-mode-report #:make-device-attributes-reply
                 #:key-event-kind #:key-event-keypad #:key-event-shifted-key
                 #:key-event-base-layout-key #:key-event-text #:key-event-modifiers
+                #:key-event-locks
                 #:key-event= #:describe-event
                 #:+shift+ #:+alt+ #:+ctrl+ #:+super+ #:+hyper+ #:+meta+ #:+caps-lock+
                 #:+num-lock+)
@@ -50,6 +51,9 @@ or :RELEASE, :KEYPAD, and :SHIFTED, :BASE or :TEXT followed by a value."
                  (:shifted (setf (key-event-shifted-key event) (pop spec)))
                  (:base (setf (key-event-base-layout-key event) (pop spec)))
                  (:text (setf (key-event-text event) (pop spec)))
+                 ((:caps-lock :num-lock)
+                  (setf (key-event-locks event)
+                        (logior (modifier-bit item) (key-event-locks event))))
                  (t (setf (key-event-modifiers event)
                           (logior (modifier-bit item) (key-event-modifiers event)))))))
     event))
@@ -315,12 +319,28 @@ kitty-bytes t) when the legacy bytes need a flush, decodes to equal events."
   (is (not (key-event= (key #\a :ctrl) (key #\a))))
   (is (not (key-event= (key #\a :release) (key #\a)))))
 
+(deftest lock-states-are-not-modifiers
+  ;; Kitty reports Caps Lock and Num Lock with a key; legacy encodings can't. They go in
+  ;; LOCKS, so the two encodings still give KEY-EVENT= events.
+  (loop for (legacy kitty locks) in (list (list (bytes 1) (bytes :esc "[97;69u") +caps-lock+)
+                                          (list (bytes :esc "[A") (bytes :esc "[1;129A")
+                                                +num-lock+)
+                                          (list (bytes :esc "[3~") (bytes :esc "[3;193~")
+                                                (logior +caps-lock+ +num-lock+)))
+        do (let ((legacy-event (first (decode legacy)))
+                 (kitty-event (first (decode kitty))))
+             (is (key-event= legacy-event kitty-event))
+             (is (= 0 (key-event-locks legacy-event)))
+             (is (= locks (key-event-locks kitty-event))))))
+
 ;;; Descriptions
 
 (deftest describe-event-is-short-and-readable
   (is (equal "key ctrl+alt+a press" (describe-event (key #\a :ctrl :alt))))
   (is (equal "key shift+:f5 release" (describe-event (key :f5 :shift :release))))
   (is (equal "key space press" (describe-event (key #\Space))))
+  (is (equal "key ctrl+a press caps-lock num-lock"
+             (describe-event (key #\a :ctrl :caps-lock :num-lock))))
   (is (equal "key A press shifted=A base=a text=\"A\" keypad"
              (describe-event (key #\A :shifted #\A :base #\a :text "A" :keypad))))
   (is (equal "mouse drag left 10,4 ctrl" (describe-event (mouse :drag :left 10 4 :ctrl))))

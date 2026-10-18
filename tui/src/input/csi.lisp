@@ -17,9 +17,15 @@
 ;;; Modifiers and event kinds
 
 (defun modifier-bits (value)
-  "The modifier mask for the wire VALUE of a modifier parameter (mask + 1)."
+  "The modifier mask (shift to meta) in the wire VALUE of a modifier parameter
+(mask + 1)."
   (declare (type fixnum value))
-  (logand (max 0 (1- value)) #xff))
+  (logand (max 0 (1- value)) #x3f))
+
+(defun lock-bits (value)
+  "The Caps Lock and Num Lock bits in the wire VALUE of a modifier parameter."
+  (declare (type fixnum value))
+  (logand (max 0 (1- value)) #xc0))
 
 (defun event-kind (value)
   (declare (type fixnum value))
@@ -47,6 +53,7 @@ field 1 of PARAMS, as in CSI 1 ; mods:kind A, plus EXTRA-MODIFIERS."
   (declare (type fixnum extra-modifiers))
   (make-key-event :key key
                   :modifiers (logior extra-modifiers (modifier-bits (param params 1 0 1)))
+                  :locks (lock-bits (param params 1 0 1))
                   :kind (event-kind (param params 1 1 1))
                   :keypad keypad))
 
@@ -72,6 +79,7 @@ field 1 of PARAMS, as in CSI 1 ; mods:kind A, plus EXTRA-MODIFIERS."
           (multiple-value-bind (key modifiers)
               (fold-shift key (modifier-bits (param params 1 0 1)) nil)
             (make-key-event :key key :modifiers modifiers :keypad keypad
+                            :locks (lock-bits (param params 1 0 1))
                             :kind (event-kind (param params 1 1 1)))))))))
 
 (defun tilde-event (params)
@@ -129,6 +137,7 @@ field 1 of PARAMS, as in CSI 1 ; mods:kind A, plus EXTRA-MODIFIERS."
               (fold-shift key (modifier-bits (param params 1 0 1)) shifted)
             (make-key-event :key key
                             :modifiers modifiers
+                            :locks (lock-bits (param params 1 0 1))
                             :kind (event-kind (param params 1 1 1))
                             :shifted-key shifted
                             :base-layout-key (alternate-key params 2)

@@ -354,35 +354,61 @@ wide grapheme straddles the edge of the skipped rect."
 
 (defvar *sink* nil)
 
+(defun steady-state-renderers (lines styles counter)
+  "Two render functions for 12 rows: one that draws the same frame every time, and one that
+also changes two rows each frame, depending on the fixnum in the cons COUNTER."
+  (let ((unchanged (lambda (frame)
+                     (let ((buffer (frame-buffer frame)))
+                       (dotimes (y 12)
+                         (set-string buffer 0 y (aref lines (mod y 3))
+                                     :style (aref styles 0)))
+                       (set-cursor frame 1 1)))))
+    (values unchanged
+            (lambda (frame)
+              (funcall unchanged frame)
+              ;; A different line, in a style that alternates, on a row that moves:
+              ;; every frame differs from the one before in two rows.
+              (let* ((n (car counter))
+                     (row (mod n 12)))
+                (set-string (frame-buffer frame) (mod n 5) row (aref lines (mod (1+ row) 3))
+                            :style (aref styles (mod n 2))))))))
+
 (deftest steady-state-drawing-does-not-allocate
-  (with-pty (pty 40 12)
-    (let* ((null-fd (sb-posix:open "/dev/null" sb-posix:o-wronly))
-           (terminal (make-terminal (pty-slave pty) null-fd))
-           (style (make-style :fg :red :bg (rgb 10 20 30) :modifiers :bold))
-           (lines (vector "the quick brown fox" (str #x65E5 #x672C #x8A9E #x1F600 "e" #x301)
-                          (str #x2764 #xFE0F " flags " #x1F1FA #x1F1F8)))
-           (counter 0)
-           (unchanged (lambda (frame)
-                        (let ((buffer (frame-buffer frame)))
-                          (dotimes (y 12)
-                            (set-string buffer 0 y (aref lines (mod y 3)) :style style))
-                          (set-cursor frame 1 1))))
-           (changing (lambda (frame)
-                       (funcall unchanged frame)
-                       ;; About 10% of the screen changes every frame.
-                       (set-string (frame-buffer frame) 0 (mod counter 12)
-                                   (aref lines (mod counter 3)) :style style))))
-      (record-features terminal :synchronized-output t)
-      (unwind-protect
-           (flet ((consed (function frames)
-                    (dotimes (i 10) (draw terminal function) (incf counter))
-                    (let ((before (sb-ext:get-bytes-consed)))
-                      (dotimes (i frames)
-                        (draw terminal function)
-                        (setf counter (logand (1+ counter) #xFFFF)))
-                      (- (sb-ext:get-bytes-consed) before))))
-             ;; 10000 frames: any allocation of 7 or more bytes per frame fills a 64 KB
-             ;; allocation region and shows up in GET-BYTES-CONSED.
-             (is (= 0 (consed unchanged 10000)))
-             (is (= 0 (consed changing 10000))))
-        (sb-posix:close null-fd)))))
+  (let* ((styles (vector (make-style :fg :red :bg (rgb 10 20 30) :modifiers :bold)
+                         (make-style :fg (rgb 200 100 0) :modifiers :italic)))
+         (lines (vector "the quick brown fox" (str #x65E5 #x672C #x8A9E #x1F600 "e" #x301)
+                        (str #x2764 #xFE0F " flags " #x1F1FA #x1F1F8)))
+         (counter (list 0)))
+    (multiple-value-bind (unchanged changing) (steady-state-renderers lines styles counter)
+      (with-pty (pty 40 12)
+        ;; The changing frames really do change: each one writes output.
+        (let ((terminal (make-terminal (pty-slave pty))))
+          (draw terminal changing)
+          (dotimes (i 3)
+            (drain-pty pty)
+            (incf (car counter))
+            (draw terminal changing)
+            (is (plusp (length (read-pty pty)))))
+          (draw terminal unchanged)
+          (drain-pty pty)
+          (draw terminal unchanged)
+          (is (zerop (length (read-pty pty :timeout 0.05))))))
+      (with-pty (pty 40 12)
+        (let* ((null-fd (sb-posix:open "/dev/null" sb-posix:o-wronly))
+               (terminal (make-terminal (pty-slave pty) null-fd)))
+          (record-features terminal :synchronized-output t)
+          (unwind-protect
+               (flet ((consed (function frames)
+                        (dotimes (i 10)
+                          (draw terminal function)
+                          (incf (car counter)))
+                        (let ((before (sb-ext:get-bytes-consed)))
+                          (dotimes (i frames)
+                            (draw terminal function)
+                            (setf (car counter) (logand (1+ (car counter)) #xFFFF)))
+                          (- (sb-ext:get-bytes-consed) before))))
+                 ;; 10000 frames: any allocation of 7 or more bytes per frame fills a 64 KB
+                 ;; allocation region and shows up in GET-BYTES-CONSED.
+                 (is (= 0 (consed unchanged 10000)))
+                 (is (= 0 (consed changing 10000))))
+            (sb-posix:close null-fd)))))))

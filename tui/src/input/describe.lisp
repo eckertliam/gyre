@@ -4,8 +4,8 @@
   (:use #:cl)
   (:import-from #:tui/input/event
                 #:+shift+ #:+alt+ #:+ctrl+ #:+super+ #:+hyper+ #:+meta+ #:+caps-lock+ #:+num-lock+
-                #:key-event #:key-event-key #:key-event-modifiers #:key-event-kind
-                #:key-event-shifted-key #:key-event-base-layout-key #:key-event-text
+                #:key-event #:key-event-key #:key-event-modifiers #:key-event-locks
+                #:key-event-kind #:key-event-shifted-key #:key-event-base-layout-key #:key-event-text
                 #:key-event-keypad
                 #:mouse-event #:mouse-event-kind #:mouse-event-button #:mouse-event-x
                 #:mouse-event-y #:mouse-event-modifiers
@@ -25,9 +25,14 @@
 (defun modifier-names (modifiers)
   "The names of the bits set in MODIFIERS."
   (loop for (bit name) in `((,+ctrl+ "ctrl") (,+alt+ "alt") (,+shift+ "shift")
-                            (,+super+ "super") (,+hyper+ "hyper") (,+meta+ "meta")
-                            (,+caps-lock+ "caps-lock") (,+num-lock+ "num-lock"))
+                            (,+super+ "super") (,+hyper+ "hyper") (,+meta+ "meta"))
         when (logtest bit modifiers)
+          collect name))
+
+(defun lock-names (locks)
+  "The names of the lock states set in LOCKS."
+  (loop for (bit name) in `((,+caps-lock+ "caps-lock") (,+num-lock+ "num-lock"))
+        when (logtest bit locks)
           collect name))
 
 (defun key-name (key)
@@ -54,14 +59,16 @@ other invisible characters as U+XXXX), a named key as its keyword."
     (write-char #\" out)))
 
 (defun describe-key (event)
-  (format nil "key ~{~A+~}~A ~(~A~)~@[ shifted=~A~]~@[ base=~A~]~@[ text=~A~]~:[~; keypad~]"
+  (format nil "key ~{~A+~}~A ~(~A~)~@[ shifted=~A~]~@[ base=~A~]~@[ text=~A~]~:[~; keypad~]~
+               ~{ ~A~}"
           (modifier-names (key-event-modifiers event))
           (key-name (key-event-key event))
           (key-event-kind event)
           (and (key-event-shifted-key event) (key-name (key-event-shifted-key event)))
           (and (key-event-base-layout-key event) (key-name (key-event-base-layout-key event)))
           (and (key-event-text event) (quoted-text (key-event-text event)))
-          (key-event-keypad event)))
+          (key-event-keypad event)
+          (lock-names (key-event-locks event))))
 
 (defun describe-mouse (event)
   (format nil "mouse ~(~A~)~@[ ~(~A~)~] ~D,~D~@[ ~{~A~^+~}~]"

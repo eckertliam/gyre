@@ -192,7 +192,7 @@
   (and (key-event-p event)
        (not (eq (key-event-kind event) :release))
        (eql (key-event-key event) key)
-       (= (logandc2 (key-event-modifiers event) #b11000000) modifiers)))
+       (= (key-event-modifiers event) modifiers)))
 
 (defun move (demo direction)
   "Move whatever the current tab controls by DIRECTION, 1 or -1."

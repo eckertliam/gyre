@@ -183,3 +183,18 @@
       ;; The terminal can be entered again.
       (with-terminal (ta)
         (is (raw-mode-p (pty-slave a)))))))
+
+(deftest a-failed-enter-still-restores-the-terminal
+  ;; Output to a descriptor open only for reading: every write fails.
+  (with-pty (a 80 24)
+    (let* ((read-only (sb-posix:open "/dev/null" sb-posix:o-rdonly))
+           (ta (make-terminal (pty-slave a) read-only)))
+      (unwind-protect
+           (progn
+             (signals tui/posix:system-call-failed (with-terminal (ta) nil))
+             (is (not (raw-mode-p (pty-slave a))))
+             (is (not (terminal-raw-p ta)))
+             (is (not (terminal-entered-p ta)))
+             ;; The output buffer was emptied although the writes failed.
+             (is (zerop (tui/output:output-fill (tui/terminal:terminal-output ta)))))
+        (sb-posix:close read-only)))))

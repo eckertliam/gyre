@@ -386,3 +386,13 @@ the designator D, and :valid if it succeeds."
      (:legacy 0 100 ((:ratio 1 4) (:percentage 25)) ((0 75) (75 25)))
      (:legacy 0 100 ((:ratio 1 4) (:fill 25)) ((0 25) (25 75)))
      (:legacy 0 100 ((:fill 25) (:ratio 1 4)) ((0 75) (75 25))))))
+
+(deftest split-does-not-keep-the-callers-rect
+  ;; A caller may pass a stack-allocated rect; the cache must hold its own copy.
+  (let ((layout (make-layout :constraints '((:length 1) (:fill 1)))))
+    (let ((area (make-rect 0 0 10 10)))
+      (declare (dynamic-extent area))
+      (split layout area))
+    (is (not (eq (tui/layout::layout-cached-area layout) nil)))
+    (is (tui/layout:rect= (make-rect 0 0 10 10) (tui/layout::layout-cached-area layout)))
+    (is (eq (split layout (make-rect 0 0 10 10)) (split layout (make-rect 0 0 10 10))))))

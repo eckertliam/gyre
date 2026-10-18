@@ -5,7 +5,7 @@
   (:export #:+shift+ #:+alt+ #:+ctrl+ #:+super+ #:+hyper+ #:+meta+ #:+caps-lock+ #:+num-lock+
            #:event #:eventp
            #:key-event #:make-key-event #:key-event-p #:key-event-key #:key-event-modifiers
-           #:key-event-kind #:key-event-shifted-key #:key-event-base-layout-key
+           #:key-event-kind #:key-event-locks #:key-event-shifted-key #:key-event-base-layout-key
            #:key-event-text #:key-event-keypad #:key-event=
            #:mouse-event #:make-mouse-event #:mouse-event-p #:mouse-event-kind
            #:mouse-event-button #:mouse-event-x #:mouse-event-y #:mouse-event-modifiers
@@ -24,7 +24,8 @@
 (in-package #:tui/input/event)
 
 ;;; Modifier bits, laid out as in the kitty keyboard protocol (whose modifier
-;;; field on the wire is this mask plus one).
+;;; field on the wire is this mask plus one). Caps Lock and Num Lock are not
+;;; modifiers of a key event: they go in its LOCKS mask.
 
 (defconstant +shift+ 1)
 (defconstant +alt+ 2)
@@ -44,7 +45,9 @@
   "A key press, repeat or release.
 KEY is a character for keys that produce text (#\\Space for space) or a keyword
 naming any other key (:enter, :up, :f5, :left-shift ...). MODIFIERS is a mask of
-+SHIFT+, +ALT+, +CTRL+, +SUPER+, +HYPER+, +META+, +CAPS-LOCK+ and +NUM-LOCK+.
++SHIFT+, +ALT+, +CTRL+, +SUPER+, +HYPER+ and +META+. LOCKS is a mask of +CAPS-LOCK+
+and +NUM-LOCK+, which the kitty protocol can report along with a key and legacy
+encodings never do.
 Shift is folded into character keys whenever the shifted character is known, so
 shift+a is #\\A with no modifiers, as typed without the kitty protocol. KIND is
 :PRESS, :REPEAT or :RELEASE. SHIFTED-KEY, BASE-LAYOUT-KEY and TEXT are the kitty
@@ -52,6 +55,7 @@ protocol's alternate keys and associated text, nil when the terminal didn't send
 them. KEYPAD is true for keys the kitty protocol reports as on the keypad."
   (key nil :type (or character keyword))
   (modifiers 0 :type fixnum)
+  (locks 0 :type fixnum)
   (kind :press :type (member :press :repeat :release))
   (shifted-key nil :type (or null character keyword))
   (base-layout-key nil :type (or null character keyword))
@@ -109,8 +113,9 @@ PARAMS of CSI ? params c, in order."
   (params nil :type list))
 
 (defun key-event= (a b)
-  "True when key events A and B have the same key, modifiers and kind. The kitty
-extras (shifted key, base layout key, text and keypad) are not compared."
+  "True when key events A and B have the same key, modifiers and kind. Lock states
+and the kitty extras (shifted key, base layout key, text and keypad) are not
+compared."
   (declare (type key-event a b))
   (and (eql (key-event-key a) (key-event-key b))
        (= (key-event-modifiers a) (key-event-modifiers b))

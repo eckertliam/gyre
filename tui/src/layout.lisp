@@ -168,7 +168,9 @@ not safe to share between threads."
               (if horizontal
                   (make-rect (+ (rect-x inner) start) (rect-y inner) extent (rect-height inner))
                   (make-rect (rect-x inner) (+ (rect-y inner) start) (rect-width inner) extent)))))
-    (setf (layout-cached-area layout) area
+    ;; Keep a copy: AREA may be the caller's stack-allocated rect.
+    (setf (layout-cached-area layout) (make-rect (rect-x area) (rect-y area)
+                                                 (rect-width area) (rect-height area))
           (layout-cached-areas layout) areas)))
 
 (defun split-area (area direction constraints &rest options
