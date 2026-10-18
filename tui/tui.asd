@@ -26,6 +26,7 @@
                (:file "layout-properties")
                (:file "rect")
                (:file "buffer")
+               (:file "buffer-text")
                (:file "input")
                (:file "input-keys")
                (:file "input-events")
