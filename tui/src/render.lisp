@@ -24,6 +24,7 @@
            #:frame-area
            #:frame-count
            #:set-cursor
+           #:invalid-cursor-shape
            #:hide-cursor
            #:draw
            #:cursor-shapes))
@@ -51,10 +52,18 @@ cursor to show when the frame is done."
   "The cursor shapes SET-CURSOR accepts."
   (mapcar #'car *cursor-shapes*))
 
+(define-condition invalid-cursor-shape (error)
+  ((shape :initarg :shape :reader invalid-cursor-shape-shape))
+  (:report (lambda (condition stream)
+             (format stream "~S is not a cursor shape; see CURSOR-SHAPES."
+                     (invalid-cursor-shape-shape condition))))
+  (:documentation "Signaled when SET-CURSOR is given an unknown cursor shape."))
+
 (defun set-cursor (frame x y &optional (shape :default))
   "Show the cursor at column X, row Y with SHAPE (see CURSOR-SHAPES) when FRAME is drawn.
 Without a call to SET-CURSOR during DRAW, the cursor is hidden."
-  (assert (assoc shape *cursor-shapes*) (shape) "~S is not a cursor shape." shape)
+  (unless (assoc shape *cursor-shapes*)
+    (error 'invalid-cursor-shape :shape shape))
   (setf (frame-cursor-x frame) x
         (frame-cursor-y frame) y
         (frame-cursor-shape frame) shape))

@@ -19,7 +19,9 @@
   (:import-from #:tui/diff #:make-pen #:write-diff #:write-sgr-reset)
   (:import-from #:tui/terminal
                 #:make-terminal #:invalidate #:record-features)
-  (:import-from #:tui/render #:draw #:frame-buffer #:frame-area #:set-cursor #:hide-cursor))
+  (:import-from #:tui/render
+                #:draw #:frame-buffer #:frame-area #:set-cursor #:hide-cursor
+                #:invalid-cursor-shape))
 
 (in-package #:tui/tests/render)
 
@@ -294,7 +296,9 @@ wide grapheme straddles the edge of the skipped rect."
       (is (string= "" (frame-output pty terminal (lambda (frame) (set-cursor frame 3 1 :bar)))))
       (is (string= "~[1;1H"
                    (frame-output pty terminal (lambda (frame) (set-cursor frame 0 0 :bar)))))
-      (is (string= "~[?25l" (frame-output pty terminal #'hide-cursor))))))
+      (is (string= "~[?25l" (frame-output pty terminal #'hide-cursor)))
+      (signals invalid-cursor-shape
+        (draw terminal (lambda (frame) (set-cursor frame 0 0 :triangle)))))))
 
 (deftest synchronized-output-wraps-frames
   (with-pty (pty 6 2)
