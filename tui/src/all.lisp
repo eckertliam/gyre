@@ -14,4 +14,5 @@
                  #:tui/input
                  #:tui/terminal
                  #:tui/caps
-                 #:tui/render))
+                 #:tui/render
+                 #:tui/widgets))
