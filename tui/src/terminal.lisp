@@ -37,6 +37,7 @@
            #:synchronized-output-supported-p
            #:features-detected-p
            #:record-features
+           #:terminal-already-entered
            #:with-raw-mode
            #:wait-for-input
            #:read-input
