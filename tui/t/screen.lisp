@@ -218,7 +218,9 @@ REST. Return the color and the remaining parameters."
                (25 (setf (screen-cursor-visible screen) (char= final #\h)))
                ((2026 1049 2004 1004 1000 1002 1003 1006))
                (t (unexpected "private mode ~D" mode)))))
-          ((and private (char= final #\u)))      ; kitty keyboard push and pop
+          ((and private (char= final #\u)))      ; kitty keyboard query, push and pop
+          ((and private (string= intermediates "$") (char= final #\p))) ; DECRQM query
+          ((and (not private) (char= final #\c)))  ; primary device attributes query
           (t (unexpected "CSI ~:[~;?~]~A~A~A" private parameters intermediates final)))))
 
 (defun feed-screen (screen octets)

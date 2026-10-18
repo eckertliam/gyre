@@ -32,10 +32,12 @@ STRICT := --eval '(defun load-strictly (system) \
 
 .PHONY: test bench inspector demo clean
 
-# Compile everything from scratch so that every warning is seen, then run the tests.
+# Compile everything from scratch, examples included, so that every warning is seen, then run
+# the tests.
 test:
 	rm -rf $(BUILD)/fasl
-	$(LISP) $(STRICT) --eval '(load-strictly "tui/tests")' --eval '(tui/tests/harness:main)'
+	$(LISP) $(STRICT) --eval '(load-strictly "tui/tests")' --eval '(load-strictly "tui/examples")' \
+	  --eval '(tui/tests/harness:main)'
 
 bench:
 	$(LISP) $(STRICT) --eval '(load-strictly "tui/tests")' --eval '(tui/tests/bench:main)'

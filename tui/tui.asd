@@ -9,7 +9,7 @@
 
 (defsystem "tui/tests"
   :description "Tests and benchmarks for tui."
-  :depends-on ("tui" "sb-posix")
+  :depends-on ("tui" "tui/examples" "sb-posix")
   :pathname "t"
   :serial t
   :components ((:file "harness")
@@ -35,6 +35,7 @@
                (:file "caps")
                (:file "render")
                (:file "widgets")
+               (:file "examples")
                (:file "bench"))
   :perform (test-op (o c) (uiop:symbol-call '#:tui/tests/harness '#:run-tests)))
 
