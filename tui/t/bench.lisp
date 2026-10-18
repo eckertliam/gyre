@@ -57,17 +57,21 @@ style, so drawing with SHIFT 8 after SHIFT 0 changes 10% of the rows."
   (draw terminal (lambda (frame) (render-screen frame lines styles 0))))
 
 (defun microseconds-per-frame (function lines styles frames)
-  "Draw FRAMES frames on a terminal whose output goes to /dev/null."
+  "Return the time per frame, in microseconds, of drawing FRAMES frames on a terminal whose
+output goes to /dev/null."
   (with-pty (pty +columns+ +rows+)
     (let* ((null-fd (sb-posix:open "/dev/null" sb-posix:o-wronly))
            (terminal (make-terminal (pty-slave pty) null-fd)))
       (unwind-protect
            (progn
              (dotimes (i 20) (funcall function terminal lines styles i))
-             (let ((start (get-internal-real-time)))
-               (dotimes (i frames) (funcall function terminal lines styles i))
-               (/ (* 1000000.0 (- (get-internal-real-time) start))
-                  internal-time-units-per-second frames)))
+             ;; The median of five batches, so that a stray GC doesn't skew the result.
+             (flet ((batch ()
+                      (let ((start (get-internal-real-time)))
+                        (dotimes (i frames) (funcall function terminal lines styles i))
+                        (/ (* 1000000.0 (- (get-internal-real-time) start))
+                           internal-time-units-per-second frames))))
+               (nth 2 (sort (loop repeat 5 collect (batch)) #'<))))
         (sb-posix:close null-fd)))))
 
 (defun bytes-per-frame (function lines styles frames)
@@ -117,6 +121,6 @@ that changes 10%, and one that doesn't change."
                                           ("unchanged" no-change 2000))
           do (format t "  ~12A ~8,1F µs/frame  ~7D bytes/frame~%"
                      name
-                     (microseconds-per-frame function lines styles frames)
+                     (microseconds-per-frame function lines styles (floor frames 5))
                      (bytes-per-frame function lines styles 4))))
   (finish-output))
