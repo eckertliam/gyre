@@ -2,7 +2,9 @@
 #
 # ASDF is configured on the command line for each invocation: it sees only the
 # .asd files in this repository (plus SBCL's contribs) and writes compiled files
-# under build/. No global ASDF, Quicklisp or init file is used.
+# under build/. No global ASDF, Quicklisp or init file is used. The .claude
+# directory is excluded because tools keep git worktrees (copies of the
+# repository, with their own .asd files) there.
 
 SBCL ?= sbcl
 ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
@@ -10,7 +12,7 @@ BUILD := $(ROOT)/build
 
 LISP := $(SBCL) --noinform --non-interactive --no-sysinit --no-userinit \
 	--eval '(require :asdf)' \
-	--eval '(asdf:initialize-source-registry (quote (:source-registry (:tree "$(ROOT)/") :ignore-inherited-configuration)))' \
+	--eval '(asdf:initialize-source-registry (quote (:source-registry (:also-exclude ".claude") (:tree "$(ROOT)/") :ignore-inherited-configuration)))' \
 	--eval '(asdf:initialize-output-translations (quote (:output-translations (t ("$(BUILD)/fasl/" :implementation :**/ :*.*.*)) :ignore-inherited-configuration)))' \
 	--eval '(setf *compile-verbose* nil *compile-print* nil)'
 
