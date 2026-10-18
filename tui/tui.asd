@@ -18,6 +18,8 @@
                (:file "style")
                (:file "width")
                (:file "text")
+               (:file "wrap")
+               (:file "reflow")
                (:file "layout")
                (:file "layout-letters")
                (:file "layout-flex")
