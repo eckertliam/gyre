@@ -98,8 +98,8 @@ versions and no compatibility promises.
 ### Terminal layer
 
 - Written in-house, with no ncurses. It covers raw mode via termios, input
-  decoding (kitty keyboard protocol, xterm `modifyOtherKeys` / `CSI u`,
-  legacy sequences, SGR mouse, bracketed paste) and a cell-grid renderer that
+  decoding (kitty keyboard protocol / `CSI u`, legacy sequences, SGR mouse,
+  bracketed paste) and a cell-grid renderer that
   diffs the previous frame against the new one and writes only the changes.
 - Every terminal object wraps a specific file descriptor, not
   `/dev/tty` or stdin. That is what lets one server drive many clients'
@@ -110,40 +110,22 @@ versions and no compatibility promises.
 
 ### Terminal support
 
-gyre must work fully in **tmux** (the usual setup) running inside Ghostty or
-kitty, and directly in **Ghostty** and **kitty**. Inside tmux, gyre is talking
-to tmux, not to the outer terminal, so the features tmux supports set the
-baseline.
+gyre must work in **tmux** (the usual setup), **Ghostty** and **kitty**, with
+no special tmux configuration. Helix is the reference here
+(`helix-tui/src/backend/termina.rs` in `~/helix`).
 
 - **Detect features by querying the terminal, never from `TERM`.** Detection
   happens per client, when it connects, and the results are per-client state.
-  Inside tmux, tmux answers the queries.
-- **Keyboard input comes in three tiers, chosen by detection:**
-  1. **Kitty keyboard protocol** (`CSI ? u` query, enable with `CSI > flags u`,
-     disable with `CSI < u` on detach). Used directly in Ghostty and kitty.
-     No released tmux supports it.
-  2. **xterm `modifyOtherKeys` mode 2** (`CSI > 4 ; 2 m`). This is the path
-     inside tmux 3.5+, which delivers keys as `CSI u` or `CSI 27 ; mod ; key ~`
-     depending on `extended-keys-format`. Decode both forms.
-  3. **Legacy encoding**, with a timeout to tell Esc apart from the start of a
-     sequence.
-- **Default keybindings must work in tier 2**, because that's what tmux
-  provides. Don't rely on kitty-only features (key release events,
-  alternate/base-layout keys, modifier-only presses) for anything essential.
-- **Esc latency inside tmux** is decided by tmux's `escape-time` (default 10ms
-  since tmux 3.5), not by gyre.
-- **Synchronized output** (mode 2026) is used when DECRQM reports it (tmux 3.7+,
-  Ghostty, kitty). Rendering must still look correct without it.
-- **Resize:** the client-forwarded `SIGWINCH` is the main mechanism, because
-  tmux doesn't provide in-band resize reports (mode 2048). Mode 2048 is an
-  optional extra.
-- **Clipboard** uses OSC 52, which goes through the client's terminal (and
-  tmux's `set-clipboard`) to the machine the user is on.
-- **tmux settings gyre expects:** `extended-keys on`, the outer terminal
-  recognized as supporting extended keys (the `extkeys` terminal feature),
-  `focus-events on`, and `set-clipboard on`.
-- **Manual testing:** check terminal-facing changes in tmux inside Ghostty, as
-  well as directly in Ghostty and kitty.
+- **Keyboard:** query for the kitty keyboard protocol and enable it if
+  supported; otherwise use legacy encoding, with a short timeout to tell Esc
+  apart from the start of a sequence. Default tmux delivers legacy keys, so
+  **default keybindings must work with legacy encoding.** Also decode `CSI u`
+  keys whenever they arrive (tmux sends them with `extended-keys` on).
+- **Synchronized output** (mode 2026): use it when the terminal reports
+  support. Rendering must look correct without it.
+- **Resize:** the client forwards `SIGWINCH` (see Client/server).
+- **Clipboard:** use the system clipboard tools (`pbcopy`, `wl-copy`, etc.),
+  falling back to OSC 52.
 
 ### Editing model
 
